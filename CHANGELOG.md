@@ -2,6 +2,12 @@
 
 ## [unreleased]
 
+- Fixed variables/feedbacks going stale until the connection was toggled: unhandled device reports, layout updates, preset loads, reconnects and our own commands now trigger a state re-read
+- Added configurable state refresh interval (safety-net polling)
+- Added source tally variables (per input, per screen, PGM/PVW) and a Source Tally feedback
+- State resync no longer overwrites screen selection set by Load Preset while commands are in flight (could make an early TAKE hit the wrong screens)
+- Commands refused by the device (non-zero response code) are now logged as warnings
+- Variables are now only pushed to Companion when their value changes
 - Added the ability to load the layers presets
 - Added move and resize layer actions
 

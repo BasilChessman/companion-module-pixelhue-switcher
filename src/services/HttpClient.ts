@@ -47,11 +47,37 @@ export class HttpClient {
 		return this.request<T>('GET', path)
 	}
 
+	/** Called synchronously when a write (command) starts, and when it settles */
+	onWriteStart: (() => void) | null = null
+	onWriteEnd: ((ok: boolean) => void) | null = null
+	/** Called when the device returns an error code in the response body */
+	onDeviceError: ((message: string) => void) | null = null
+
+	private async write<T>(method: Method, path: string, json: unknown): Promise<T> {
+		this.onWriteStart?.()
+		let ok = false
+		const startedAt = Date.now()
+		try {
+			const res = await this.request<T>(method, path, { json })
+			ok = true
+			// The device answers HTTP 200 with a non-zero `code` when it refuses a command (e.g. busy)
+			const body = res as { code?: unknown; message?: unknown } | null
+			if (body && typeof body.code === 'number' && body.code !== 0) {
+				this.onDeviceError?.(
+					`${method} ${path} refused by device after ${Date.now() - startedAt}ms: code=${body.code} message=${String(body.message ?? '')}`,
+				)
+			}
+			return res
+		} finally {
+			this.onWriteEnd?.(ok)
+		}
+	}
+
 	async post<T = any, B = Record<string, unknown>>(path: string, json: B): Promise<T> {
-		return this.request<T>('POST', path, { json })
+		return this.write<T>('POST', path, json)
 	}
 
 	async put<T = any, B = Record<string, unknown>>(path: string, json: B): Promise<T> {
-		return this.request<T>('PUT', path, { json })
+		return this.write<T>('PUT', path, json)
 	}
 }

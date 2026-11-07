@@ -15,6 +15,7 @@ import { Interface } from './interfaces/Interface.js'
 import { CropSource } from './interfaces/CropSource.js'
 import { discoverDevices } from './services/Discovery.js'
 import { SourceBackup } from './interfaces/SourceBackup.js'
+import { StateSync } from './services/StateSync.js'
 
 export class ModuleInstance extends InstanceBase<ModuleConfig> {
 	config: ModuleConfig = defaultConfig() // Setup in init()
@@ -43,6 +44,10 @@ export class ModuleInstance extends InstanceBase<ModuleConfig> {
 	globalFreeze: number = 0
 
 	linkedSourceNameCache: Map<string, string> | null = null
+
+	stateSync: StateSync = new StateSync(this)
+	/** Last values sent to Companion, so only changes are pushed */
+	lastVariableValues: Map<string, unknown> = new Map()
 
 	constructor(internal: unknown) {
 		super(internal)
@@ -139,6 +144,7 @@ export class ModuleInstance extends InstanceBase<ModuleConfig> {
 			this.checkFeedbacks('sourceSignalState')
 
 			this.updateStatus(InstanceStatus.Ok)
+			this.stateSync.startPolling(this.config.pollInterval)
 
 			this.saveConfig({
 				...this.config,
@@ -202,6 +208,8 @@ export class ModuleInstance extends InstanceBase<ModuleConfig> {
 			this.webSocket = await WebSocketClient.create(this, this.config.host, token)
 			this.wsReconnectAttempt = 0
 			this.updateStatus(InstanceStatus.Ok)
+			// Anything that changed while disconnected was missed
+			this.stateSync.request('websocket reconnected', 'full', 0)
 		} catch (err) {
 			const msg = err instanceof Error ? err.message : String(err)
 			this.log('error', `WebSocket reconnect failed: ${msg}`)
@@ -231,11 +239,13 @@ export class ModuleInstance extends InstanceBase<ModuleConfig> {
 
 		this.setActionDefinitions({})
 		this.setFeedbackDefinitions({})
+		this.lastVariableValues.clear()
 		this.setVariableDefinitions([])
 		this.setPresetDefinitions({})
 	}
 
 	private cleanupConnections(): void {
+		this.stateSync.stop()
 		if (this.wsReconnectTimeout) {
 			clearTimeout(this.wsReconnectTimeout)
 			this.wsReconnectTimeout = null
@@ -267,6 +277,7 @@ export class ModuleInstance extends InstanceBase<ModuleConfig> {
 	}
 
 	updateVariableDefinitions(): void {
+		this.lastVariableValues.clear()
 		updateCompanionVariableDefinitions(this)
 	}
 

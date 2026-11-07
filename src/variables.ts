@@ -4,6 +4,7 @@ import { LoadIn } from './interfaces/Preset.js'
 import { SCREEN_TYPE } from './interfaces/Screen.js'
 import { Layer } from './interfaces/Layer.js'
 import { getBackupActiveSourceShortDisplay } from './utils/backupDisplay.js'
+import { getTallyVariableDefinitions, getTallyVariableValues } from './utils/tally.js'
 
 export function updateCompanionVariableDefinitions(self: ModuleInstance): void {
 	const presetVariableDefinitions: CompanionVariableDefinition[] = self.presets.map((preset) => {
@@ -89,6 +90,7 @@ export function updateCompanionVariableDefinitions(self: ModuleInstance): void {
 		...screensFtbVariableDefinitions,
 		...layersVariableDefinitions,
 		...backupVariableDefinitions,
+		...getTallyVariableDefinitions(self),
 	])
 }
 
@@ -128,7 +130,7 @@ export function updateVariableValues(self: ModuleInstance): void {
 		)
 	})
 
-	self.setVariableValues({
+	const allValues: CompanionVariableValues = {
 		global_load_in: self.globalLoadPresetIn === LoadIn.preview ? 'Preview' : 'Program',
 		global_load_in_short: self.globalLoadPresetIn === LoadIn.preview ? 'PVW' : 'PGM',
 		global_load_in_program: self.globalLoadPresetIn === LoadIn.program,
@@ -144,7 +146,21 @@ export function updateVariableValues(self: ModuleInstance): void {
 		...screenVariables,
 		...layerVariables,
 		...backupVariables,
-	})
+		...getTallyVariableValues(self),
+	}
+
+	// Only push what changed; re-check tally feedbacks when tally state moved
+	const changed: CompanionVariableValues = {}
+	let tallyChanged = false
+	for (const [id, value] of Object.entries(allValues)) {
+		if (self.lastVariableValues.has(id) && self.lastVariableValues.get(id) === value) continue
+		self.lastVariableValues.set(id, value)
+		changed[id] = value
+		if (id.startsWith('tally_') || id.endsWith('_pgm_sources') || id.endsWith('_pvw_sources')) tallyChanged = true
+	}
+
+	if (Object.keys(changed).length > 0) self.setVariableValues(changed)
+	if (tallyChanged) self.checkFeedbacks('sourceTally')
 }
 
 function getLayerVariableId(self: ModuleInstance, layer: Layer): string {

@@ -123,3 +123,32 @@ This module uses both WebSocket and REST API communication for:
 - **Ports**: HTTP and WebSocket ports must be accessible
 - **Authentication**: Device password required for access
 - **Companion Version**: Compatible with Companion v3.0+
+
+## Tally
+
+The module works out which inputs are in a layer on **Program** or **Preview** of each screen (normal screens and AUX outputs; multiviewer layers are ignored). Crops count as their parent input.
+
+### Tally variables
+
+`<id>` is the input's interface ID. Look up the full list, with names, under the connection's **Variables** tab.
+
+| Variable | Value |
+| --- | --- |
+| `tally_input_<id>_state` | `PGM`, `PVW` or `OFF` (Program wins) |
+| `tally_input_<id>_pgm` / `_pvw` | `true` / `false`, on any screen |
+| `tally_input_<id>_screen_<screenId>_pgm` / `_pvw` | `true` / `false` for one specific screen |
+| `tally_input_<id>_pgm_screens` / `_pvw_screens` | Comma-separated names of the screens it is on |
+| `tally_input_<id>_name` | Input name |
+| `screen_<screenId>_pgm_sources` / `_pvw_sources` | Comma-separated sources on that screen |
+| `tally_pgm_inputs` / `tally_pvw_inputs` | Comma-separated inputs on any screen |
+
+For "on screen A **or** B", use an expression variable such as (replace `pixelhue` with your connection label)
+`$(pixelhue:tally_input_3_screen_1_pgm) || $(pixelhue:tally_input_3_screen_2_pgm)`.
+
+### Tally feedback
+
+**Source Tally (on Program / Preview)** lets you pick a source, a bus, one or more screens (empty = any), and whether the source must be on ANY or ALL of them.
+
+## State refresh
+
+Variables and feedbacks follow device reports over the WebSocket. When the device reports a change the module can't apply directly, after every command the module sends, and after a reconnect, the module re-reads screens, layers and presets. **State refresh interval** in the connection config adds a periodic re-read as a safety net. The default is 5 seconds; 0 turns it off.

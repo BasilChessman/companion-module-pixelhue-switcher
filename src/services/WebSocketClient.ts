@@ -9,6 +9,15 @@ const MESSAGE_TYPE_NAMES: Record<number, string> = Object.fromEntries(
 	Object.entries(MessageTypes).map(([name, tag]) => [tag, name]),
 )
 
+/** Handlers that only partially apply the change locally; follow them with a full re-read of layers */
+const RESYNC_AFTER_TAGS = new Set<number>([
+	MessageTypes.layoutUpdated,
+	MessageTypes.presetApplied,
+	MessageTypes.createScreen,
+	MessageTypes.screenDeleted,
+	MessageTypes.layerPresetCreated,
+])
+
 export class WebSocketClient {
 	private instance: ModuleInstance
 	private host: string
@@ -22,6 +31,7 @@ export class WebSocketClient {
 	private readonly onRuntimeClose = () => this.notifyDisconnect()
 
 	private decoder = new TextDecoder()
+	private readonly seenUnhandledTags = new Set<number>()
 
 	constructor(instance: ModuleInstance, host: string, token: string) {
 		this.instance = instance
@@ -110,25 +120,52 @@ export class WebSocketClient {
 	private messageReceived(data: WebSocket.RawData): void {
 		if (!(data instanceof Buffer)) return
 
-		const parsedMessage = this.parseTLVBuffer(Buffer.from(data))
-		//this.instance.log('info', `WebSocket message received: ${JSON.stringify(parsedMessage)}`)
-
-		const handlerId = Object.keys(webSocketHandlers)
-			.map(Number)
-			.find((id) => id == parsedMessage.tag)
-
-		if (handlerId == null) return
+		let parsedMessage: WebsocketCallbackData
+		try {
+			parsedMessage = this.parseTLVBuffer(Buffer.from(data))
+		} catch (err) {
+			// Never let a malformed frame throw inside the ws listener
+			this.instance.log('debug', `WS: failed to parse frame: ${err instanceof Error ? err.message : String(err)}`)
+			return
+		}
 
 		if (!isMessageForThisDevice(this.instance, parsedMessage)) {
 			return
 		}
 
-		const tagName = MESSAGE_TYPE_NAMES[parsedMessage.tag] ?? 'unknown'
+		const tag = parsedMessage.tag
+		const tagHex = `0x${tag.toString(16)}`
+		const handler = webSocketHandlers[tag]
+
+		if (!handler) {
+			// The device reports many state changes (layer source, take, etc.) we don't model.
+			// Rather than drop them, re-read state so variables/tally stay current.
+			if (!this.seenUnhandledTags.has(tag)) {
+				this.seenUnhandledTags.add(tag)
+				this.instance.log('info', `WS report ${tagHex} not handled directly; resyncing state when it occurs`)
+			}
+			this.instance.log('debug', `WS unhandled ${tagHex}: ${JSON.stringify(parsedMessage.data)}`)
+			this.instance.stateSync.request(`ws ${tagHex}`)
+			return
+		}
+
+		const tagName = MESSAGE_TYPE_NAMES[tag] ?? 'unknown'
 		const rawSn = parsedMessage.header?.sn ?? parsedMessage.header?.SN
 		const sn = typeof rawSn === 'string' || typeof rawSn === 'number' ? String(rawSn) : ''
-		this.instance.log('info', `WS report: ${tagName} (0x${parsedMessage.tag.toString(16)}) sn=${sn}`)
+		this.instance.log('info', `WS report: ${tagName} (${tagHex}) sn=${sn}`)
 		this.instance.log('debug', `WebSocket message received: ${JSON.stringify(parsedMessage)}`)
-		webSocketHandlers[parsedMessage.tag](this.instance, parsedMessage)
+
+		try {
+			handler(this.instance, parsedMessage)
+		} catch (err) {
+			this.instance.log('warn', `WS handler ${tagName} failed: ${err instanceof Error ? err.message : String(err)}`)
+			this.instance.stateSync.request(`ws ${tagName} handler error`, 'full')
+			return
+		}
+
+		if (RESYNC_AFTER_TAGS.has(tag)) {
+			this.instance.stateSync.request(`ws ${tagName}`)
+		}
 	}
 
 	parseTLVBuffer(buffer: Buffer): WebsocketCallbackData {

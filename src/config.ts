@@ -12,12 +12,15 @@ export const defaultConfig = (): ModuleConfig => {
 	return {
 		host: '127.0.0.1',
 		deviceSn: DEFAULT_DEVICE_SN,
+		pollInterval: 5,
 	}
 }
 
 export interface ModuleConfig {
 	host: string
 	deviceSn?: string
+	/** Seconds between safety-net state refreshes; 0 disables */
+	pollInterval?: number
 }
 
 export class Config {
@@ -52,6 +55,17 @@ export class Config {
 				width: 12,
 				choices,
 				default: resolvedDefault,
+			},
+			{
+				type: 'number',
+				id: 'pollInterval',
+				label: 'State refresh interval (seconds, 0 = off)',
+				tooltip:
+					'Safety net: periodically re-reads screens, layers and presets so variables and tally stay correct even if the device does not report a change.',
+				width: 6,
+				min: 0,
+				max: 60,
+				default: 5,
 			},
 		]
 	}

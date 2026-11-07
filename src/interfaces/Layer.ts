@@ -41,6 +41,10 @@ export interface LayerSource {
 
 export interface LayerSourceGeneral {
 	sourceName: string
+	sourceId?: number
+	/** 8 = crop source; otherwise the input's interfaceType */
+	sourceType?: number
+	connectorType?: number
 }
 
 export interface LayerUMD {

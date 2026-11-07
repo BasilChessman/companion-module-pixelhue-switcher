@@ -92,6 +92,9 @@ export class ApiClient {
 		this.token = generateToken(serialNumber, startTime)
 		instance.log('debug', `Token: ${this.token}`)
 		this.http.setToken(this.token)
+		this.http.onWriteStart = () => instance.stateSync.writeStarted()
+		this.http.onWriteEnd = (ok) => instance.stateSync.writeFinished(ok)
+		this.http.onDeviceError = (message) => instance.log('warn', message)
 
 		instance.log('debug', 'Get Screens')
 		const screenResponse = await this.getScreens()

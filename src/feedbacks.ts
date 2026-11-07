@@ -4,6 +4,7 @@ import { LoadIn } from './interfaces/Preset.js'
 import { DropdownChoice } from '@companion-module/base'
 import { SCREEN_TYPE } from './interfaces/Screen.js'
 import { buildInterfaceLookup, getInputSourceChoices } from './actionUtils.js'
+import { computeTally, getTallyScreens, TallyBus } from './utils/tally.js'
 
 const COLOR_ONLINE = combineRgb(23, 207, 42)
 const COLOR_ERROR = combineRgb(228, 50, 50)
@@ -348,6 +349,80 @@ export function updateCompanionFeedbacks(self: ModuleInstance): void {
 					entry.usingSourceId === entry.backupSourceId && entry.usingSourceType === entry.backupSourceType
 
 				return usingBackup
+			},
+		},
+		sourceTally: {
+			name: 'Source Tally (on Program / Preview)',
+			type: 'boolean',
+			description:
+				'True when the chosen input or crop is in a layer on Program (or Preview) of the chosen screens. Crops of an input count as that input.',
+			defaultStyle: {
+				bgcolor: combineRgb(255, 0, 0),
+				color: combineRgb(255, 255, 255),
+			},
+			options: [
+				{
+					type: 'dropdown',
+					id: 'inputId',
+					label: 'Source',
+					default: '',
+					choices: getInputSourceChoices(self, () => self.updateFeedbacks()),
+				},
+				{
+					type: 'dropdown',
+					id: 'bus',
+					label: 'Bus',
+					default: 'pgm',
+					choices: [
+						{ id: 'pgm', label: 'Program' },
+						{ id: 'pvw', label: 'Preview' },
+					],
+				},
+				{
+					type: 'multidropdown',
+					id: 'screenIds',
+					label: 'Screens (empty = any screen)',
+					default: [],
+					choices: getTallyScreens(self).map((screen): DropdownChoice => ({
+						id: screen.guid,
+						label: screen.general.name,
+					})),
+				},
+				{
+					type: 'dropdown',
+					id: 'match',
+					label: 'Match',
+					default: 'any',
+					choices: [
+						{ id: 'any', label: 'On ANY of the selected screens' },
+						{ id: 'all', label: 'On ALL of the selected screens' },
+					],
+				},
+			],
+			callback: (feedback) => {
+				const inputId = String(feedback.options.inputId ?? '')
+				const bus: TallyBus = feedback.options.bus === 'pvw' ? 'pvw' : 'pgm'
+				const tally = computeTally(self)
+
+				let onScreens: Set<number> | undefined
+				if (inputId.startsWith('interface_')) {
+					onScreens = tally.inputs[bus].get(Number(inputId.replace('interface_', '')))
+				} else if (inputId.startsWith('crop_')) {
+					onScreens = tally.crops[bus].get(Number(inputId.replace('crop_', '')))
+				}
+				if (!onScreens || onScreens.size === 0) return false
+
+				const guids = (feedback.options.screenIds as string[] | undefined) ?? []
+				if (guids.length === 0) return true
+
+				const targetIds = guids
+					.map((guid) => self.screens.find((s) => s.guid === guid)?.screenId)
+					.filter((id): id is number => id !== undefined)
+				if (targetIds.length === 0) return false
+
+				return feedback.options.match === 'all'
+					? targetIds.every((id) => onScreens.has(id))
+					: targetIds.some((id) => onScreens.has(id))
 			},
 		},
 		sourceSignalState: {

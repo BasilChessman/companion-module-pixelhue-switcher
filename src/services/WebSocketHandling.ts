@@ -7,6 +7,7 @@ import { filterValidScreens, isValidPreset, isValidScreen } from '../utils/listF
 import { realMerge } from '../utils/utils.js'
 import { SourceBackup } from '../interfaces/SourceBackup.js'
 import { sourceBackupStateKey, sourceBackupStructureKey } from '../utils/backupDisplay.js'
+import { publishState, structureKey } from './StateSync.js'
 
 export const MessageTypes = {
 	layersSelected: 0x81105,
@@ -105,8 +106,10 @@ export function screenPropertiesChanged(self: ModuleInstance, message: Websocket
 	const screens = normalizeScreenPatchData(message.data)
 	if (screens.length === 0) return
 
+	const before = structureKey(self)
 	updateScreens(self, screens)
-	self.updateVariableValues()
+	// Screen renames also change dropdown labels and variable names
+	publishState(self, before)
 }
 
 function normalizeScreenPatchData(data: unknown): Screen[] {
@@ -246,9 +249,10 @@ export function layerPresetCreated(self: ModuleInstance, message: WebsocketCallb
 }
 
 export function layoutUpdated(self: ModuleInstance, message: WebsocketCallbackData): void {
-	const data: UpdateLayoutData = message.data
+	const data: UpdateLayoutData = message.data ?? {}
+	const before = structureKey(self)
 
-	data.deleteLayers.forEach((layerToDelete) => {
+	;(data.deleteLayers ?? []).forEach((layerToDelete) => {
 		const index = self.layers.findIndex((layer) => {
 			return layer.layerId === layerToDelete.layerId
 		})
@@ -258,7 +262,13 @@ export function layoutUpdated(self: ModuleInstance, message: WebsocketCallbackDa
 		}
 	})
 
-	self.layers.push(...data.createLayers)
+	;(data.createLayers ?? []).forEach((created) => {
+		self.layers = self.layers.filter((layer) => layer.layerId !== created.layerId)
+		self.layers.push(created)
+	})
+
+	// Previously the layer list changed here without Companion ever being told
+	publishState(self, before)
 }
 
 export function layerMoved(self: ModuleInstance, message: WebsocketCallbackData): void {
@@ -292,7 +302,8 @@ export function umdUpdated(self: ModuleInstance, message: WebsocketCallbackData)
 }
 
 export function layerGeneralUpdated(self: ModuleInstance, message: WebsocketCallbackData): void {
-	const newLayersGeneral: any[] = message.data
+	const newLayersGeneral: any[] = Array.isArray(message.data) ? message.data : []
+	const before = structureKey(self)
 	newLayersGeneral.forEach((newLayerGeneral) => {
 		const layer = self.layers.find((layer) => {
 			return layer.layerId === newLayerGeneral.layerId
@@ -303,7 +314,7 @@ export function layerGeneralUpdated(self: ModuleInstance, message: WebsocketCall
 		layer.general = newLayerGeneral.general
 	})
 
-	self.updateVariableValues()
+	publishState(self, before)
 }
 
 export function presetApplied(self: ModuleInstance, message: WebsocketCallbackData): void {
@@ -396,6 +407,7 @@ export function screenDeleted(self: ModuleInstance, message: WebsocketCallbackDa
 
 export function renameInputSource(self: ModuleInstance, message: WebsocketCallbackData): void {
 	const renameItems = Array.isArray(message.data) ? message.data : [message.data]
+	const before = structureKey(self)
 
 	renameItems.forEach((renameItem) => {
 		if (!renameItem?.interfaceId) return
@@ -408,9 +420,7 @@ export function renameInputSource(self: ModuleInstance, message: WebsocketCallba
 		targetInterface.general.name = renameItem.general.name
 	})
 
-	self.updateActions()
-	self.updateFeedbacks()
-	self.updateVariableValues()
+	publishState(self, before)
 }
 
 export function interfaceUpdated(self: ModuleInstance, _message: WebsocketCallbackData): void {
@@ -420,10 +430,11 @@ export function interfaceUpdated(self: ModuleInstance, _message: WebsocketCallba
 
 	void Promise.all([self.apiClient.getInterfaces(), self.apiClient.getCropSources()])
 		.then(([interfacesResponse, cropSourcesResponse]) => {
+			const before = structureKey(self)
 			self.interfaces = interfacesResponse.data.list
 			self.cropSources = cropSourcesResponse.data.list
-			self.checkFeedbacks('sourceSignalState')
-			self.updateVariableValues()
+			// Inputs/crops can appear or be renamed; that affects tally variables and dropdowns
+			publishState(self, before)
 		})
 		.catch((err) => {
 			self.log(
