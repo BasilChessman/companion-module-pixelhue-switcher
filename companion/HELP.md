@@ -126,21 +126,21 @@ This module uses both WebSocket and REST API communication for:
 
 ## Tally
 
-The module works out which inputs are in a layer on **Program** or **Preview** of each screen (normal screens and AUX outputs; multiviewer layers are ignored). Crops count as their parent input.
+The module works out which inputs are in a layer on **Program** or **Preview** of each screen (normal screens and AUX outputs; multiviewer layers are ignored). Crops count as their parent input. Layers showing a screen or a gallery image do not count toward any input's tally.
 
 ### Tally variables
 
 `<id>` is the input's interface ID. Look up the full list, with names, under the connection's **Variables** tab.
 
-| Variable | Value |
-| --- | --- |
-| `tally_input_<id>_state` | `PGM`, `PVW` or `OFF` (Program wins) |
-| `tally_input_<id>_pgm` / `_pvw` | `true` / `false`, on any screen |
-| `tally_input_<id>_screen_<screenId>_pgm` / `_pvw` | `true` / `false` for one specific screen |
-| `tally_input_<id>_pgm_screens` / `_pvw_screens` | Comma-separated names of the screens it is on |
-| `tally_input_<id>_name` | Input name |
-| `screen_<screenId>_pgm_sources` / `_pvw_sources` | Comma-separated sources on that screen |
-| `tally_pgm_inputs` / `tally_pvw_inputs` | Comma-separated inputs on any screen |
+| Variable                                          | Value                                         |
+| ------------------------------------------------- | --------------------------------------------- |
+| `tally_input_<id>_state`                          | `PGM`, `PVW` or `OFF` (Program wins)          |
+| `tally_input_<id>_pgm` / `_pvw`                   | `true` / `false`, on any screen               |
+| `tally_input_<id>_screen_<screenId>_pgm` / `_pvw` | `true` / `false` for one specific screen      |
+| `tally_input_<id>_pgm_screens` / `_pvw_screens`   | Comma-separated names of the screens it is on |
+| `tally_input_<id>_name`                           | Input name                                    |
+| `screen_<screenId>_pgm_sources` / `_pvw_sources`  | Comma-separated sources on that screen        |
+| `tally_pgm_inputs` / `tally_pvw_inputs`           | Comma-separated inputs on any screen          |
 
 For "on screen A **or** B", use an expression variable such as (replace `pixelhue` with your connection label)
 `$(pixelhue:tally_input_3_screen_1_pgm) || $(pixelhue:tally_input_3_screen_2_pgm)`.

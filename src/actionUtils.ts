@@ -6,7 +6,7 @@ import {
 	SomeCompanionActionInputField,
 } from '@companion-module/base'
 import { LoadIn } from './interfaces/Preset.js'
-import { Layer } from './interfaces/Layer.js'
+import { Layer, LAYER_SOURCE_TYPE } from './interfaces/Layer.js'
 import { Screen, SCREEN_TYPE } from './interfaces/Screen.js'
 import { discoverDevices } from './services/Discovery.js'
 import { ApiClient } from './services/ApiClient.js'
@@ -30,12 +30,10 @@ export function getLayerSelectionOptions(
 
 	const screenChoices = self.screens
 		.filter((screen) => allowedScreenTypes.includes(screen.screenIdObj.type))
-		.map(
-			(screen): DropdownChoice => ({
-				id: screen.screenId,
-				label: screen.general.name,
-			}),
-		)
+		.map((screen): DropdownChoice => ({
+			id: screen.screenId,
+			label: screen.general.name,
+		}))
 
 	return [
 		...fields,
@@ -187,14 +185,47 @@ export function getInputSourceChoices(self: ModuleInstance, onUpdate: () => void
 			}
 		})
 
-	const cropChoices = self.cropSources.map(
-		(cropSource): DropdownChoice => ({
-			id: `crop_${cropSource.cropId}`,
-			label: `${cropSource.name} (Crop)`,
-		}),
-	)
+	const cropChoices = self.cropSources.map((cropSource): DropdownChoice => ({
+		id: `crop_${cropSource.cropId}`,
+		label: `${cropSource.name} (Crop)`,
+	}))
 
 	return [...interfaceChoices, ...cropChoices]
+}
+
+/** Choices for "Set Input on Layer": inputs and crops, plus screens (program output) and gallery pictures */
+export function getLayerSourceChoices(self: ModuleInstance, onUpdate: () => void): DropdownChoice[] {
+	const screenChoices = self.screens
+		.filter((screen) => [SCREEN_TYPE.SCREEN, SCREEN_TYPE.AUX].includes(screen.screenIdObj.type))
+		.map((screen): DropdownChoice => ({
+			id: `screen_${screen.screenId}`,
+			label: `${screen.general.name} (Screen)`,
+		}))
+
+	const pictureChoices = self.pictures.map((picture): DropdownChoice => ({
+		id: `picture_${picture.pictureId}`,
+		label: `${picture.general.name} (Image)`,
+	}))
+
+	return [...getInputSourceChoices(self, onUpdate), ...screenChoices, ...pictureChoices]
+}
+
+/** Parse a `screen_<id>` / `picture_<id>` choice into the layer source the device expects */
+export function parseScreenOrPictureSource(
+	self: ModuleInstance,
+	choiceId: string,
+): { sourceType: number; sourceId: number } | undefined {
+	const match = /^(screen|picture)_(\d+)$/.exec(choiceId)
+	if (!match) return undefined
+	const id = Number(match[2])
+	if (match[1] === 'screen') {
+		return self.screens.some((s) => s.screenId === id)
+			? { sourceType: LAYER_SOURCE_TYPE.SCREEN, sourceId: id }
+			: undefined
+	}
+	return self.pictures.some((p) => p.pictureId === id)
+		? { sourceType: LAYER_SOURCE_TYPE.PICTURE, sourceId: id }
+		: undefined
 }
 
 export async function getLinkedSourceName(

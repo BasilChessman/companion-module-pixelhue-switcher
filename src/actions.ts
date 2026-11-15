@@ -3,8 +3,9 @@ import { DropdownChoice } from '@companion-module/base'
 import { LoadIn } from './interfaces/Preset.js'
 import {
 	buildInterfaceLookup,
-	getInputSourceChoices,
 	getLayerBySelection,
+	getLayerSourceChoices,
+	parseScreenOrPictureSource,
 	getLayerSelectionOptions,
 	getScreensBySelection,
 	getScreenSelectionOptions,
@@ -12,7 +13,7 @@ import {
 import { LayerBounds, LayerUMD } from './interfaces/Layer.js'
 import { HTTPError } from 'got'
 import { SCREEN_TYPE } from './interfaces/Screen.js'
-import { SourceBackup } from './interfaces/SourceBackup.js'
+import { BACKUP_TARGET } from './interfaces/SourceBackup.js'
 import {
 	TEST_PATTERN_TYPE_CHOICES,
 	SCREEN_TEST_PATTERN_TYPE_CHOICES,
@@ -681,7 +682,7 @@ export function updateCompanionActions(self: ModuleInstance): void {
 					id: 'inputId',
 					label: 'Input',
 					default: '',
-					choices: getInputSourceChoices(self, () => self.updateActions()),
+					choices: getLayerSourceChoices(self, () => self.updateActions()),
 				},
 				...getLayerSelectionOptions(self, true, [SCREEN_TYPE.SCREEN, SCREEN_TYPE.AUX]),
 			],
@@ -721,13 +722,18 @@ export function updateCompanionActions(self: ModuleInstance): void {
 					}
 
 					await self.apiClient?.setCropSourceOnLayer(layer, cropSource, mainSource)
+				} else {
+					const source = parseScreenOrPictureSource(self, inputId)
+					if (source === undefined) return
+
+					await self.apiClient?.setSourceOnLayer(layer, source.sourceType, source.sourceId)
 				}
 			},
 		},
 		switchSourceBackup: {
 			name: 'Switch Input Backup',
 			description:
-				'Manual switch of input backup when enable=1. Skips PUT when disabled, or when switchMode=0 (auto) and either primary/backup source is offline.',
+				'Switch an input backup pair to its primary or backup source (when input backup is enabled). Skips the command when the pair already uses that source, or when switchMode=0 (auto) and either source is offline.',
 			options: [
 				{
 					type: 'dropdown',
@@ -746,9 +752,20 @@ export function updateCompanionActions(self: ModuleInstance): void {
 						}
 					}),
 				},
+				{
+					type: 'dropdown',
+					id: 'target',
+					label: 'Switch to',
+					default: BACKUP_TARGET.PRIMARY,
+					choices: [
+						{ id: BACKUP_TARGET.PRIMARY, label: 'Primary source' },
+						{ id: BACKUP_TARGET.BACKUP, label: 'Backup source' },
+					],
+				},
 			],
 			callback: async (event) => {
 				const selectedId = Number(event.options.backupSourceId)
+				const useBackup = event.options.target === BACKUP_TARGET.BACKUP
 
 				const currentSourceBackup = self.sourceBackups.sourceBackup
 				if (!currentSourceBackup || !currentSourceBackup.backup) return
@@ -769,36 +786,12 @@ export function updateCompanionActions(self: ModuleInstance): void {
 					return
 				}
 
-				try {
-					const newBackupSource: SourceBackup = {
-						sourceBackup: {
-							...currentSourceBackup,
-							backup: currentSourceBackup.backup.map((backup) => {
-								if (backup.id !== selectedId) {
-									return backup
-								}
+				const targetSourceId = useBackup ? entry.backupSourceId : entry.primarySourceId
+				const targetSourceType = useBackup ? entry.backupSourceType : entry.primarySourceType
 
-								const usingPrimary =
-									backup.usingSourceId === backup.primarySourceId && backup.usingSourceType === backup.primarySourceType
-
-								return {
-									...backup,
-									primaryFirst: 0,
-									usingSourceId: usingPrimary ? backup.backupSourceId : backup.primarySourceId,
-									usingSourceType: usingPrimary ? backup.backupSourceType : backup.primarySourceType,
-								}
-							}),
-						},
-					}
-
-					self.log('debug', `Setting new backup source: ${JSON.stringify(newBackupSource)}`)
-					await self.apiClient?.setBackupSource(newBackupSource)
-					self.sourceBackups = newBackupSource
-					self.updateVariableValues()
-				} catch (error: any) {
-					self.log('error', 'switchSourceBackup send error')
-					self.log('error', error)
-				}
+				// Queued and coalesced: the device takes the whole backup list per PUT, so several actions
+				// fired together must not each send their own copy (the last one would undo the others)
+				await self.backupSwitcher.request(selectedId, targetSourceId, targetSourceType)
 			},
 		},
 		setTestPattern: {
@@ -816,12 +809,10 @@ export function updateCompanionActions(self: ModuleInstance): void {
 						.filter((screen) => {
 							return [SCREEN_TYPE.SCREEN, SCREEN_TYPE.AUX].includes(screen.screenIdObj.type)
 						})
-						.map(
-							(screen): DropdownChoice => ({
-								id: screen.screenId,
-								label: screen.general.name,
-							}),
-						),
+						.map((screen): DropdownChoice => ({
+							id: screen.screenId,
+							label: screen.general.name,
+						})),
 				},
 				{
 					type: 'dropdown',

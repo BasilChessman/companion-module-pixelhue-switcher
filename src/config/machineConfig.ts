@@ -40,6 +40,8 @@ export interface MachineConfig {
 			layerPresetApply: string
 			interfaces: string
 			cropSource: string
+			/** Image gallery (pictures usable as layer sources) */
+			pictureList: string
 		}
 		crtl: {
 			sourceBackup: string

@@ -26,6 +26,7 @@ export function structureKey(self: ModuleInstance): string {
 		]),
 		self.interfaces.map((i) => [i.interfaceId, i.general?.name, i.linkInfo?.isLink]),
 		self.cropSources.map((c) => [c.cropId, c.name]),
+		self.pictures.map((p) => [p.pictureId, p.general?.name]),
 		(self.sourceBackups.sourceBackup?.backup ?? []).map((b) => b.id),
 	])
 }
@@ -158,7 +159,9 @@ export class StateSync {
 		try {
 			const [screens, presets, layers] = await Promise.all([api.getScreens(), api.getPresets(), api.getLayers()])
 			const extra =
-				scope === 'full' ? await Promise.all([api.getInterfaces(), api.getCropSources(), api.getBackupSource()]) : null
+				scope === 'full'
+					? await Promise.all([api.getInterfaces(), api.getCropSources(), api.getBackupSource(), api.getPictures()])
+					: null
 
 			if (gen !== this.generation || this.self.apiClient !== api) return
 
@@ -173,10 +176,11 @@ export class StateSync {
 			if (Array.isArray(presets.data?.list)) this.self.presets = presets.data.list
 			if (Array.isArray(layers.data?.list)) this.self.layers = layers.data.list
 			if (extra) {
-				const [interfaces, crops, backups] = extra
+				const [interfaces, crops, backups, pictures] = extra
 				if (Array.isArray(interfaces.data?.list)) this.self.interfaces = interfaces.data.list
 				if (Array.isArray(crops.data?.list)) this.self.cropSources = crops.data.list
 				if (backups.data?.sourceBackup) this.self.sourceBackups = backups.data
+				if (pictures) this.self.pictures = pictures
 			}
 			publishState(this.self, before)
 		} catch (err) {

@@ -42,7 +42,7 @@ export interface LayerSource {
 export interface LayerSourceGeneral {
 	sourceName: string
 	sourceId?: number
-	/** 8 = crop source; otherwise the input's interfaceType */
+	/** See LAYER_SOURCE_TYPE; for inputs this is the input's interfaceType */
 	sourceType?: number
 	connectorType?: number
 }
@@ -52,4 +52,13 @@ export interface LayerUMD {
 	enable: 0 | 1
 	name: string
 	type: number
+}
+
+/** layer.source.general.sourceType values (device accepts 1,2,3,5,6,8 on normal layers) */
+export const LAYER_SOURCE_TYPE = {
+	/** Program output of another screen; sourceId = screenId */
+	SCREEN: 3,
+	/** Picture from the image gallery; sourceId = pictureId */
+	PICTURE: 5,
+	CROP: 8,
 }

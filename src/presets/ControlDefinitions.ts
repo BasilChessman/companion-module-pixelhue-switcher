@@ -1,6 +1,7 @@
 import { combineRgb, CompanionPresetDefinitions } from '@companion-module/base'
 import type { ModuleInstance } from '../main.js'
 import { PRESET_CATEGORY } from '../utils/constants.js'
+import { BACKUP_TARGET } from '../interfaces/SourceBackup.js'
 import { LoadIn } from '../interfaces/Preset.js'
 
 export function getControlPresetDefinitions(self: ModuleInstance): CompanionPresetDefinitions {
@@ -182,10 +183,10 @@ export function getControlPresetDefinitions(self: ModuleInstance): CompanionPres
 			? {
 					switchBackupSource: {
 						type: 'button',
-						name: 'Switch Backup Source',
+						name: 'Switch to Backup Source',
 						category: PRESET_CATEGORY.CONTROL,
 						style: {
-							text: 'Switch Backup\nSource',
+							text: 'Switch to\nBackup',
 							size: 16,
 							color: combineRgb(255, 255, 255),
 							bgcolor: combineRgb(0, 0, 0),
@@ -197,6 +198,7 @@ export function getControlPresetDefinitions(self: ModuleInstance): CompanionPres
 										actionId: 'switchSourceBackup',
 										options: {
 											backupSourceId: firstBackup.id,
+											target: BACKUP_TARGET.BACKUP,
 										},
 									},
 								],
@@ -212,6 +214,7 @@ export function getControlPresetDefinitions(self: ModuleInstance): CompanionPres
 								},
 								options: {
 									backupSourceId: firstBackup.id,
+									target: BACKUP_TARGET.BACKUP,
 								},
 							},
 						],

@@ -14,6 +14,7 @@ import { MODEL_ID_TO_KEY, ModelKey } from '../config/modelMap.js'
 import { MACHINE_CONFIGS, MachineConfig } from '../config/machineConfig.js'
 import { SourceBackup } from '../interfaces/SourceBackup.js'
 import { TestPatternPayload } from '../interfaces/TestPattern.js'
+import { Picture } from '../interfaces/Picture.js'
 
 type CreateOptions = {
 	model?: ModelKey
@@ -110,6 +111,8 @@ export class ApiClient {
 		const cropSourcesResponse = await this.getCropSources()
 		instance.log('debug', 'Get Backup Sources')
 		const backupSourceResponse = await this.getBackupSource()
+		instance.log('debug', 'Get Pictures')
+		const pictures = await this.getPictures()
 
 		instance.screens = screenResponse.data.list
 		instance.presets = presetResponse.data.list
@@ -118,6 +121,7 @@ export class ApiClient {
 		instance.interfaces = interfacesResponse.data.list
 		instance.cropSources = cropSourcesResponse.data.list
 		instance.sourceBackups = backupSourceResponse.data
+		instance.pictures = pictures ?? []
 	}
 
 	async _getDeviceList(includeClientType: boolean = false): Promise<any> {
@@ -293,6 +297,24 @@ export class ApiClient {
 		return this.http!.put(this.cfg.endpoints.layers.source, body)
 	}
 
+	/** Put a screen's program output (LAYER_SOURCE_TYPE.SCREEN) or a gallery picture (LAYER_SOURCE_TYPE.PICTURE) on a layer */
+	async setSourceOnLayer(layer: Layer, sourceType: number, sourceId: number): Promise<any> {
+		const body = [
+			{
+				layerId: layer.layerId,
+				source: {
+					general: {
+						sourceId,
+						sourceType,
+						connectorType: 0,
+					},
+				},
+			},
+		]
+
+		return this.http!.put(this.cfg.endpoints.layers.source, body)
+	}
+
 	async setTestPatternOnScreen(screen: Screen, payload: TestPatternPayload): Promise<any> {
 		const body = [
 			{
@@ -335,6 +357,16 @@ export class ApiClient {
 
 	async getCropSources(): Promise<Response<CropSourcesListDetailData>> {
 		return this.http!.get(this.cfg.endpoints.layers.cropSource)
+	}
+
+	/** Gallery pictures; null when the request fails (e.g. model/firmware without a picture gallery) */
+	async getPictures(): Promise<Picture[] | null> {
+		try {
+			const res = await this.http!.get<Response<{ list: Picture[] }>>(this.cfg.endpoints.layers.pictureList)
+			return Array.isArray(res.data?.list) ? res.data.list : null
+		} catch {
+			return null
+		}
 	}
 
 	async getBackupSource(): Promise<Response<SourceBackup>> {

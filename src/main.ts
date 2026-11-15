@@ -13,9 +13,11 @@ import { WebSocketClient } from './services/WebSocketClient.js'
 import { LayerPreset } from './interfaces/LayerPreset.js'
 import { Interface } from './interfaces/Interface.js'
 import { CropSource } from './interfaces/CropSource.js'
+import { Picture } from './interfaces/Picture.js'
 import { discoverDevices } from './services/Discovery.js'
 import { SourceBackup } from './interfaces/SourceBackup.js'
 import { StateSync } from './services/StateSync.js'
+import { BackupSwitcher } from './utils/backupSwitcher.js'
 
 export class ModuleInstance extends InstanceBase<ModuleConfig> {
 	config: ModuleConfig = defaultConfig() // Setup in init()
@@ -32,6 +34,7 @@ export class ModuleInstance extends InstanceBase<ModuleConfig> {
 	layerPresets: LayerPreset[] = []
 	interfaces: Interface[] = []
 	cropSources: CropSource[] = []
+	pictures: Picture[] = []
 	sourceBackups: SourceBackup = { sourceBackup: { backup: [], enable: 0, primaryFirst: 0 } }
 	swapEnabled: boolean = true
 	effectTime: number = 1000
@@ -46,6 +49,7 @@ export class ModuleInstance extends InstanceBase<ModuleConfig> {
 	linkedSourceNameCache: Map<string, string> | null = null
 
 	stateSync: StateSync = new StateSync(this)
+	backupSwitcher: BackupSwitcher = new BackupSwitcher(this)
 	/** Last values sent to Companion, so only changes are pushed */
 	lastVariableValues: Map<string, unknown> = new Map()
 
@@ -235,6 +239,7 @@ export class ModuleInstance extends InstanceBase<ModuleConfig> {
 		this.layerPresets = []
 		this.interfaces = []
 		this.cropSources = []
+		this.pictures = []
 		this.sourceBackups = { sourceBackup: { backup: [], enable: 0, primaryFirst: 0 } }
 
 		this.setActionDefinitions({})
@@ -246,6 +251,7 @@ export class ModuleInstance extends InstanceBase<ModuleConfig> {
 
 	private cleanupConnections(): void {
 		this.stateSync.stop()
+		this.backupSwitcher.stop()
 		if (this.wsReconnectTimeout) {
 			clearTimeout(this.wsReconnectTimeout)
 			this.wsReconnectTimeout = null

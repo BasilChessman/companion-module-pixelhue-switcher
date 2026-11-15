@@ -3,6 +3,7 @@ import type { ModuleInstance } from './main.js'
 import { LoadIn } from './interfaces/Preset.js'
 import { DropdownChoice } from '@companion-module/base'
 import { SCREEN_TYPE } from './interfaces/Screen.js'
+import { BACKUP_TARGET } from './interfaces/SourceBackup.js'
 import { buildInterfaceLookup, getInputSourceChoices } from './actionUtils.js'
 import { computeTally, getTallyScreens, TallyBus } from './utils/tally.js'
 
@@ -309,9 +310,10 @@ export function updateCompanionFeedbacks(self: ModuleInstance): void {
 			},
 		},
 		sourceBackupState: {
-			name: 'Input Backup – backup active',
+			name: 'Input Backup – source active',
 			type: 'boolean',
-			description: 'Change style when the selected Input Backup configuration is using the backup input',
+			description:
+				'Change style when the selected Input Backup configuration is using the chosen source (primary or backup)',
 			defaultStyle: {
 				bgcolor: combineRgb(255, 0, 0),
 				color: combineRgb(255, 255, 255),
@@ -334,6 +336,17 @@ export function updateCompanionFeedbacks(self: ModuleInstance): void {
 						}
 					}),
 				},
+				{
+					type: 'dropdown',
+					id: 'target',
+					label: 'Active source',
+					// Existing feedbacks have no `target` and keep the original "backup active" meaning
+					default: BACKUP_TARGET.BACKUP,
+					choices: [
+						{ id: BACKUP_TARGET.PRIMARY, label: 'Primary source' },
+						{ id: BACKUP_TARGET.BACKUP, label: 'Backup source' },
+					],
+				},
 			],
 			callback: (feedback) => {
 				const selectedId = Number(feedback.options.backupSourceId)
@@ -344,11 +357,11 @@ export function updateCompanionFeedbacks(self: ModuleInstance): void {
 				const entry = currentSourceBackup.backup.find((b) => b.id === selectedId)
 				if (!entry) return false
 
-				// Feedback is TRUE when we are currently using the *backup* source
-				const usingBackup =
-					entry.usingSourceId === entry.backupSourceId && entry.usingSourceType === entry.backupSourceType
+				if (feedback.options.target === BACKUP_TARGET.PRIMARY) {
+					return entry.usingSourceId === entry.primarySourceId && entry.usingSourceType === entry.primarySourceType
+				}
 
-				return usingBackup
+				return entry.usingSourceId === entry.backupSourceId && entry.usingSourceType === entry.backupSourceType
 			},
 		},
 		sourceTally: {

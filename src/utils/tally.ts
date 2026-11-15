@@ -1,12 +1,15 @@
 import type { ModuleInstance } from '../main.js'
 import type { CompanionVariableDefinition, CompanionVariableValues } from '@companion-module/base'
-import { Layer } from '../interfaces/Layer.js'
+import { Layer, LAYER_SOURCE_TYPE } from '../interfaces/Layer.js'
 import { Screen, SCREEN_TYPE } from '../interfaces/Screen.js'
 import { LoadIn } from '../interfaces/Preset.js'
 import { Interface } from '../interfaces/Interface.js'
 
 /** layer.source.general.sourceType used by the device for crop sources (see ApiClient.setCropSourceOnLayer) */
 export const CROP_SOURCE_TYPE = 8
+
+/** Screen program (3), screen preview (4, MVR layers only) and gallery picture (5) sources */
+const NON_INPUT_SOURCE_TYPES = [LAYER_SOURCE_TYPE.SCREEN, 4, LAYER_SOURCE_TYPE.PICTURE]
 
 /** Screens that count as real outputs for tally. Multiviewer (MVR) layers are ignored. */
 export const TALLY_SCREEN_TYPES = [SCREEN_TYPE.SCREEN, SCREEN_TYPE.AUX]
@@ -46,6 +49,11 @@ export function resolveLayerSource(self: ModuleInstance, layer: Layer): Resolved
 	const sourceId = typeof general.sourceId === 'number' ? general.sourceId : undefined
 	const sourceType = general.sourceType
 	const name = general.sourceName ?? ''
+
+	// Screens and gallery pictures are not inputs: their sourceId is a screenId/pictureId, which can collide with an interfaceId
+	if (sourceType !== undefined && NON_INPUT_SOURCE_TYPES.includes(sourceType)) {
+		return { interfaceId: null, cropId: null, name }
+	}
 
 	if (sourceId !== undefined) {
 		if (sourceType === CROP_SOURCE_TYPE) {

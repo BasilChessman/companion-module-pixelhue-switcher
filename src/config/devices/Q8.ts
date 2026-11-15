@@ -29,6 +29,7 @@ export const Q8: MachineConfig = {
 			layerPresetApply: '/unico/v1/layers/layer-preset/apply',
 			interfaces: '/unico/v1/interface/list-detail',
 			cropSource: '/unico/v1/interface/crop-source',
+			pictureList: '/unico/v1/picture/list?type=1',
 		},
 		crtl: {
 			sourceBackup: '/unico/v1/system/ctrl/source-backup',
