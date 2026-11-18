@@ -14,6 +14,7 @@ export const PF: MachineConfig = {
 			select: '/unico/v1/screen/select',
 			listDetail: '/unico/v1/screen/list-detail',
 			testPattern: '/unico/v1/screen/test-pattern',
+			tbar: '/unico/v1/screen/tbar',
 		},
 		preset: {
 			list: '/unico/v1/preset',

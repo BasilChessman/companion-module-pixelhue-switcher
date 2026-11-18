@@ -25,6 +25,8 @@ This module provides comprehensive control for Pixelhue video switching devices 
 - **Cut**: Perform an immediate cut transition without fade
 - **FTB (Fade to Black)**: Fade the output to black
 - **Freeze**: Freeze the current output frame
+- **T-bar position**: Move the T-bar from a value such as a hardware T-bar variable (see [T-bar](#t-bar))
+- **T-bar: reset direction**: Re-sync the T-bar direction (see [T-bar](#t-bar))
 
 ### Preset Management
 
@@ -152,3 +154,23 @@ For "on screen A **or** B", use an expression variable such as (replace `pixelhu
 ## State refresh
 
 Variables and feedbacks follow device reports over the WebSocket. When the device reports a change the module can't apply directly, after every command the module sends, and after a reconnect, the module re-reads screens, layers and presets. **State refresh interval** in the connection config adds a periodic re-read as a safety net. The default is 5 seconds; 0 turns it off.
+
+## T-bar
+
+**T-bar position** moves the switcher's T-bar on the screens selected on the switcher, using each screen's own transition effect and time, the same way the PixelHue U5 controller does. Use it to drive the T-bar from another control surface, for example a NewTek LC-11.
+
+How it behaves:
+
+- Moving the bar from one end towards the other runs the transition partway; you can stop or go back.
+- Reaching the far end completes the take. That end then becomes the start of the next transition, so you move the bar back the other way for the next take.
+- Moving back to the start before reaching the end leaves Program as it was.
+
+Setup (example for the LC-11 T-bar, which gives 0 to 255):
+
+1. Link the surface's T-bar value to a custom variable, for example `tbar`.
+2. Go to **Triggers**, add a trigger and give it the event **On variable change** for that variable.
+3. Add the action **T-bar position** to the trigger. Set **Value** to the variable (default `$(custom:tbar)`), **Value at one end** to `0` and **Value at the other end** to `255`.
+
+If the direction gets out of step (for example after a TAKE or CUT from somewhere else while the bar was partway), run **T-bar: reset direction**, or move the bar to an end; the next value takes the nearest end as the start.
+
+The T-bar command is not in PixelHue's published API. It was verified on a Q8; other models are untested.

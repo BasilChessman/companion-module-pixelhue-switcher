@@ -18,6 +18,7 @@ import { discoverDevices } from './services/Discovery.js'
 import { SourceBackup } from './interfaces/SourceBackup.js'
 import { StateSync } from './services/StateSync.js'
 import { BackupSwitcher } from './utils/backupSwitcher.js'
+import { TbarDriver } from './services/TbarDriver.js'
 
 export class ModuleInstance extends InstanceBase<ModuleConfig> {
 	config: ModuleConfig = defaultConfig() // Setup in init()
@@ -50,6 +51,7 @@ export class ModuleInstance extends InstanceBase<ModuleConfig> {
 
 	stateSync: StateSync = new StateSync(this)
 	backupSwitcher: BackupSwitcher = new BackupSwitcher(this)
+	tbar: TbarDriver = new TbarDriver(this)
 	/** Last values sent to Companion, so only changes are pushed */
 	lastVariableValues: Map<string, unknown> = new Map()
 
@@ -252,6 +254,7 @@ export class ModuleInstance extends InstanceBase<ModuleConfig> {
 	private cleanupConnections(): void {
 		this.stateSync.stop()
 		this.backupSwitcher.stop()
+		this.tbar.reset()
 		if (this.wsReconnectTimeout) {
 			clearTimeout(this.wsReconnectTimeout)
 			this.wsReconnectTimeout = null

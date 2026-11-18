@@ -203,6 +203,57 @@ export function updateCompanionActions(self: ModuleInstance): void {
 				}
 			},
 		},
+		tbarPosition: {
+			name: 'T-bar position',
+			description:
+				'Move the switcher T-bar on the selected screens from a value, e.g. a hardware T-bar variable. ' +
+				'Run it from a trigger on "variable changed". Reaching the far end completes the take; ' +
+				'that end then becomes the start of the next transition.',
+			options: [
+				{
+					type: 'textinput',
+					label: 'Value',
+					id: 'value',
+					default: '$(custom:tbar)',
+					useVariables: true,
+				},
+				{
+					type: 'number',
+					label: 'Value at one end',
+					id: 'min',
+					default: 0,
+					min: -100000,
+					max: 100000,
+				},
+				{
+					type: 'number',
+					label: 'Value at the other end',
+					id: 'max',
+					default: 255,
+					min: -100000,
+					max: 100000,
+				},
+			],
+			callback: async (event, context) => {
+				const raw = await context.parseVariablesInString(String(event.options.value ?? ''))
+				const value = Number(raw.trim())
+				if (raw.trim() === '' || !Number.isFinite(value)) {
+					self.log('debug', `T-bar position: ignoring non-numeric value "${raw}"`)
+					return
+				}
+				self.tbar.position(value, Number(event.options.min), Number(event.options.max))
+			},
+		},
+		tbarReset: {
+			name: 'T-bar: reset direction',
+			description:
+				'Use if the T-bar direction gets out of step with the switcher (e.g. after a TAKE or CUT from elsewhere ' +
+				'while the bar was mid-travel). The next T-bar value takes the nearest end as the start.',
+			options: [],
+			callback: async () => {
+				self.tbar.reset()
+			},
+		},
 		ftb: {
 			name: 'Fade to black',
 			options: [

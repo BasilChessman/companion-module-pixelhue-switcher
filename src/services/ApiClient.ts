@@ -15,6 +15,7 @@ import { MACHINE_CONFIGS, MachineConfig } from '../config/machineConfig.js'
 import { SourceBackup } from '../interfaces/SourceBackup.js'
 import { TestPatternPayload } from '../interfaces/TestPattern.js'
 import { Picture } from '../interfaces/Picture.js'
+import { TBAR_FULL, TbarScreen } from '../utils/tbar.js'
 
 type CreateOptions = {
 	model?: ModelKey
@@ -163,6 +164,23 @@ export class ApiClient {
 		}))
 
 		return this.http!.put(this.cfg.endpoints.screen.cut, body)
+	}
+
+	/** T-bar state of the currently selected screens (each with its own effect/time/swap) */
+	async getTbar(): Promise<TbarScreen[]> {
+		const res = await this.http!.get<Response<TbarScreen[]>>(this.cfg.endpoints.screen.tbar)
+		return Array.isArray(res?.data) ? res.data : []
+	}
+
+	/**
+	 * Set the T-bar position (0..4095; 4096 completes the take). Only `percent` is changed; the
+	 * screens' own transition settings are sent back unchanged. Intermediate positions skip the
+	 * write hooks so a moving bar doesn't trigger a state resync per step; the completion does not.
+	 */
+	async setTbar(screens: TbarScreen[], percent: number): Promise<any> {
+		const body = screens.map((s) => ({ ...s, percent }))
+		const path = this.cfg.endpoints.screen.tbar
+		return percent >= TBAR_FULL ? this.http!.put(path, body) : this.http!.putUntracked(path, body)
 	}
 
 	async ftb(screens: Screen[], enable: boolean, time: number): Promise<any> {

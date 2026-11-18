@@ -2,6 +2,8 @@
 
 ## [unreleased]
 
+- Added T-bar position action: drive the switcher T-bar from a variable (e.g. a hardware T-bar such as the NewTek LC-11). Reaching the far end completes the take and the direction flips. Uses the device's undocumented screen/tbar command (verified on Q8)
+- Added T-bar: reset direction action
 - Fixed variables/feedbacks going stale until the connection was toggled: unhandled device reports, layout updates, preset loads, reconnects and our own commands now trigger a state re-read
 - Added configurable state refresh interval (safety-net polling)
 - Added source tally variables (per input, per screen, PGM/PVW) and a Source Tally feedback

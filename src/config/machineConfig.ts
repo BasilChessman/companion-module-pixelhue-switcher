@@ -25,6 +25,8 @@ export interface MachineConfig {
 			select: string
 			listDetail: string
 			testPattern: string
+			/** T-bar position (undocumented; verified on Q8) */
+			tbar: string
 		}
 		preset: {
 			list: string

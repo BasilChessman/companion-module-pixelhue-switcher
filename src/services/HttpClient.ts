@@ -63,8 +63,9 @@ export class HttpClient {
 			// The device answers HTTP 200 with a non-zero `code` when it refuses a command (e.g. busy)
 			const body = res as { code?: unknown; message?: unknown } | null
 			if (body && typeof body.code === 'number' && body.code !== 0) {
+				const message = typeof body.message === 'string' ? body.message : JSON.stringify(body.message ?? '')
 				this.onDeviceError?.(
-					`${method} ${path} refused by device after ${Date.now() - startedAt}ms: code=${body.code} message=${String(body.message ?? '')}`,
+					`${method} ${path} refused by device after ${Date.now() - startedAt}ms: code=${body.code} message=${message}`,
 				)
 			}
 			return res
@@ -79,5 +80,19 @@ export class HttpClient {
 
 	async put<T = any, B = Record<string, unknown>>(path: string, json: B): Promise<T> {
 		return this.write<T>('PUT', path, json)
+	}
+
+	/**
+	 * PUT without the write hooks (no state resync per request). For high-rate commands such as
+	 * T-bar positions; refusals are still reported via onDeviceError.
+	 */
+	async putUntracked<T = any, B = Record<string, unknown>>(path: string, json: B): Promise<T> {
+		const res = await this.request<T>('PUT', path, { json })
+		const body = res as { code?: unknown; message?: unknown } | null
+		if (body && typeof body.code === 'number' && body.code !== 0) {
+			const message = typeof body.message === 'string' ? body.message : JSON.stringify(body.message ?? '')
+			this.onDeviceError?.(`PUT ${path} refused by device: code=${body.code} message=${message}`)
+		}
+		return res
 	}
 }

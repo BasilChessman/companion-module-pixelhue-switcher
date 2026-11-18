@@ -1,6 +1,6 @@
 {
 	"name": "companion-module-pixelhue-switcher",
-	"version": "2.3.3",
+	"version": "2.3.5",
 	"main": "dist/main.js",
 	"type": "module",
 	"scripts": {
@@ -11,7 +11,8 @@
 		"build:main": "tsc -p tsconfig.build.json",
 		"dev": "tsc -p tsconfig.build.json --watch",
 		"lint:raw": "eslint",
-		"lint": "npm run lint:raw ."
+		"lint": "npm run lint:raw .",
+		"test:tbar": "node test/tbar.offline.mjs dist"
 	},
 	"license": "MIT",
 	"repository": {
