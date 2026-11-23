@@ -4,7 +4,9 @@ import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 const dist = process.argv[2]
-const { TbarTracker, TbarSender, TBAR_FULL } = await import(pathToFileURL(path.join(dist, 'utils/tbar.js')).href)
+const { TbarTracker, TbarSender, TbarGlide, TBAR_FULL } = await import(
+	pathToFileURL(path.join(dist, 'utils/tbar.js')).href
+)
 const { TbarDriver } = await import(pathToFileURL(path.join(dist, 'services/TbarDriver.js')).href)
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 let n = 0
@@ -17,11 +19,11 @@ const ok = (name) => console.log(`ok ${++n} - ${name}`)
 	assert.equal(t.start, 0)
 	assert.equal(t.update(0.5), 2048)
 	assert.equal(t.update(0.5), null, 'unchanged -> null')
-	assert.equal(t.update(0.25), 1024, 'going back reduces progress')
+	assert.equal(t.update(0.25), 1003, 'going back reduces progress (end zones stretched out)')
 	assert.equal(t.update(1), TBAR_FULL, 'far end completes')
 	assert.equal(t.start, 1, 'direction flipped')
 	assert.equal(t.update(1), null, 'resting at new start')
-	assert.equal(t.update(0.75), 1024, 'moving back counts up from 0')
+	assert.equal(t.update(0.75), 1003, 'moving back counts up from 0')
 	assert.equal(t.update(0), TBAR_FULL, 'other end completes')
 	assert.equal(t.start, 0)
 	ok('tracker: sweep both ways, flip after completion')
@@ -40,7 +42,7 @@ const ok = (name) => console.log(`ok ${++n} - ${name}`)
 	t.update(0)
 	t.update(0.6)
 	t.reset()
-	assert.equal(t.update(0.6), 1638, 'after reset nearest end (1) is the start: progress 0.4')
+	assert.equal(t.update(0.6), 1630, 'after reset nearest end (1) is the start: progress 0.4')
 	assert.equal(t.start, 1)
 	assert.equal(t.update(0.9999), 0, 'back to start sends 0')
 	ok('tracker: reset')
@@ -51,7 +53,7 @@ const ok = (name) => console.log(`ok ${++n} - ${name}`)
 	assert.equal(t.update(0.9985), TBAR_FULL)
 	const t2 = new TbarTracker()
 	t2.update(0)
-	assert.equal(t2.update(0.98), 4014)
+	assert.equal(t2.update(0.98), 4054)
 	assert.ok(t2.update(0.985) <= 4095, 'never 4096 short of the end')
 	assert.equal(t.update(NaN), null)
 	ok('tracker: never sends 4096 before the end; NaN ignored')
@@ -129,7 +131,7 @@ const ok = (name) => console.log(`ok ${++n} - ${name}`)
 	const d = new TbarDriver(fake)
 	const feed = async (vals) => {
 		for (const v of vals) {
-			d.position(v, 0, 255)
+			d.position(v, 0, 255, 40, false)
 			await sleep(50)
 		}
 	}
@@ -137,7 +139,7 @@ const ok = (name) => console.log(`ok ${++n} - ${name}`)
 	await feed([0, 0, 64, 128, 192, 255])
 	assert.deepEqual(
 		puts.map((p) => p.percent),
-		[1028, 2056, 3084, TBAR_FULL],
+		[1007, 2056, 3105, TBAR_FULL],
 	)
 	assert.equal(gets.length, 1, 'screens read once per move')
 	assert.deepEqual(puts[0].ids, [6, 8])
@@ -156,16 +158,16 @@ const ok = (name) => console.log(`ok ${++n} - ${name}`)
 	await feed([60, 0])
 	assert.deepEqual(
 		puts.map((p) => p.percent),
-		[964, 0],
+		[942, 0],
 		'partial move then back to start sends 0',
 	)
 
-	d.position(5, 10, 10) // min === max ignored
-	d.position(NaN, 0, 255)
+	d.position(5, 10, 10, 40, false) // min === max ignored
+	d.position(NaN, 0, 255, 40, false)
 	await sleep(60)
 	assert.deepEqual(
 		puts.map((p) => p.percent),
-		[964, 0],
+		[942, 0],
 	)
 
 	screensOnDevice.length = 0
@@ -188,10 +190,69 @@ const ok = (name) => console.log(`ok ${++n} - ${name}`)
 	}
 	const d = new TbarDriver(fake)
 	for (const v of [255, 128, 0]) {
-		d.position(v, 255, 0)
+		d.position(v, 255, 0, 40, false)
 		await sleep(50)
 	}
 	assert.deepEqual(puts, [2040, TBAR_FULL])
 	ok('driver: reversed min/max')
+}
+
+// --- Glide ---
+{
+	const g = new TbarGlide()
+	g.jump(0, 0)
+	g.setTarget(1000, 1000, 20) // first move after a pause: takes one interval
+	assert.equal(g.valueAt(1000), 0)
+	assert.equal(g.valueAt(1010), 500)
+	assert.equal(g.valueAt(1020), 1000)
+	assert.ok(g.done(1020))
+	g.setTarget(1100, 1050, 20) // 50 ms after the last position: glides over 50 ms
+	assert.equal(g.valueAt(1075), 1050)
+	assert.ok(!g.done(1075))
+	g.setTarget(1300, 1075, 20) // new position mid-glide: carries on from where it is
+	assert.equal(g.valueAt(1075), 1050)
+	assert.equal(g.valueAt(1100), 1300)
+	g.setTarget(5000, 1200, 20)
+	assert.equal(g.valueAt(1300), TBAR_FULL - 1, 'never 4096: only a completion may send that')
+	ok('glide: fills in between positions, timed from the gap between them')
+}
+{
+	// Driver, smooth: a slow steady LC-11 move (one count every 30 ms) comes out as many small steps
+	const puts = []
+	const fake = {
+		log() {},
+		apiClient: {
+			http: {},
+			getTbar: async () => [{ screenId: 1, screenGuid: 'x', percent: 0 }],
+			setTbar: async (s, p) => puts.push([performance.now(), p]),
+		},
+	}
+	const d = new TbarDriver(fake)
+	for (let v = 0; v <= 40; v++) {
+		d.position(v, 0, 255, 10, true)
+		await sleep(30)
+	}
+	await sleep(60)
+	const values = puts.map(([, p]) => p)
+	assert.ok(values.length > 60, `many updates, not one per count (${values.length})`)
+	for (let i = 1; i < values.length; i++) assert.ok(values[i] > values[i - 1], 'always moving forward')
+	const biggest = Math.max(...values.slice(1).map((v, i) => v - values[i]))
+	assert.ok(biggest < 16, `steps smaller than one LC-11 count (16), biggest ${biggest}`)
+	assert.ok(values[0] < 16, `starts gently, first value ${values[0]}`)
+	assert.equal(values.at(-1), Math.round(((40 / 255 - 0.01) / 0.98) * TBAR_FULL), 'ends exactly on the last position')
+	const gaps = puts.slice(1).map(([t], i) => t - puts[i][0])
+	assert.ok(Math.min(...gaps) >= 9, `never faster than the interval (${Math.min(...gaps).toFixed(1)} ms)`)
+
+	// Then a fast push to the end: the completion is sent, and nothing after it
+	puts.length = 0
+	for (const v of [100, 180, 255]) {
+		d.position(v, 0, 255, 10, true)
+		await sleep(12)
+	}
+	await sleep(80)
+	assert.equal(puts.at(-1)[1], TBAR_FULL, 'completion is the last thing sent')
+	assert.equal(puts.filter(([, p]) => p === TBAR_FULL).length, 1)
+	d.reset()
+	ok('driver, smooth: small steps at the set rate, completion last')
 }
 console.log('all passed')

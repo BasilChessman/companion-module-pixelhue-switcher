@@ -171,6 +171,8 @@ Setup (example for the LC-11 T-bar, which gives 0 to 255):
 2. Go to **Triggers**, add a trigger and give it the event **On variable change** for that variable.
 3. Add the action **T-bar position** to the trigger. Set **Value** to the variable (default `$(custom:tbar)`), **Value at one end** to `0` and **Value at the other end** to `255`.
 
+Smoothness: a hardware T-bar reports far fewer positions than the switcher takes (the LC-11 has 256, the switcher 4096). With **Smooth (glide between positions)** ticked (the default), the switcher glides between them instead of jumping, so the transition moves smoothly. **Update interval (ms)** is the shortest time between updates sent to the switcher (default 15, about once per video frame). Lower is smoother; raise it if the switcher seems to lag behind the bar.
+
 If the direction gets out of step (for example after a TAKE or CUT from somewhere else while the bar was partway), run **T-bar: reset direction**, or move the bar to an end; the next value takes the nearest end as the start.
 
 The T-bar command is not in PixelHue's published API. It was verified on a Q8; other models are untested.

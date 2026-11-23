@@ -23,6 +23,7 @@ import {
 	TestPatternGridType,
 } from './interfaces/TestPattern.js'
 import { applyPresetScreenSelection } from './utils/screenSelection.js'
+import { DEFAULT_TBAR_INTERVAL_MS } from './utils/tbar.js'
 import { backupEntryHasOfflineSource } from './utils/backupDisplay.js'
 
 export function updateCompanionActions(self: ModuleInstance): void {
@@ -233,6 +234,25 @@ export function updateCompanionActions(self: ModuleInstance): void {
 					min: -100000,
 					max: 100000,
 				},
+				{
+					type: 'checkbox',
+					label: 'Smooth (glide between positions)',
+					id: 'smooth',
+					default: true,
+					tooltip:
+						'A hardware T-bar reports far fewer positions than the switcher takes, so jumping to each one looks steppy. ' +
+						'With this on, the switcher glides between them.',
+				},
+				{
+					type: 'number',
+					label: 'Update interval (ms)',
+					id: 'interval',
+					default: DEFAULT_TBAR_INTERVAL_MS,
+					min: 5,
+					max: 200,
+					tooltip:
+						'Shortest time between updates sent to the switcher. Lower is smoother; raise it if the switcher lags.',
+				},
 			],
 			callback: async (event, context) => {
 				const raw = await context.parseVariablesInString(String(event.options.value ?? ''))
@@ -241,7 +261,13 @@ export function updateCompanionActions(self: ModuleInstance): void {
 					self.log('debug', `T-bar position: ignoring non-numeric value "${raw}"`)
 					return
 				}
-				self.tbar.position(value, Number(event.options.min), Number(event.options.max))
+				self.tbar.position(
+					value,
+					Number(event.options.min),
+					Number(event.options.max),
+					Number(event.options.interval ?? DEFAULT_TBAR_INTERVAL_MS),
+					event.options.smooth !== false,
+				)
 			},
 		},
 		tbarReset: {
